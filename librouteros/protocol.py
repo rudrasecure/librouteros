@@ -206,7 +206,7 @@ class ApiProtocol(Encoder, Decoder):
 
 
 class AsyncApiProtocol(Encoder, Decoder):
-    def __init__(self, transport: AsyncSocketTransport, encoding: str, timeout: float = 10):
+    def __init__(self, transport: AsyncSocketTransport, encoding: str, timeout: float = None):
         self.transport = transport
         self.encoding = encoding
         self.timeout = timeout
@@ -218,6 +218,7 @@ class AsyncApiProtocol(Encoder, Decoder):
         LOGGER.debug(f"{direction_string} EOS")
 
     async def writeSentence(self, cmd: str, *words: str) -> None:
+        print(f"TIMEOUT - {self.timeout}")
         await asyncio.wait_for(self.__writeSentence(cmd, *words), timeout=self.timeout)
 
     async def __writeSentence(self, cmd: str, *words: str) -> None:

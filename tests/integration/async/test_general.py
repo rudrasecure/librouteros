@@ -18,6 +18,7 @@ async def test_login(routeros_login_async):
                 username="admin",
                 password="",
                 login_method=method,
+                timeout=30,
             )
             break
         except (LibRouterosError, socket.error, socket.timeout):

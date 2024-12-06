@@ -218,7 +218,6 @@ class AsyncApiProtocol(Encoder, Decoder):
         LOGGER.debug(f"{direction_string} EOS")
 
     async def writeSentence(self, cmd: str, *words: str) -> None:
-        print(f"TIMEOUT - {self.timeout}")
         await asyncio.wait_for(self.__writeSentence(cmd, *words), timeout=self.timeout)
 
     async def __writeSentence(self, cmd: str, *words: str) -> None:

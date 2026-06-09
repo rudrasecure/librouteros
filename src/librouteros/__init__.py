@@ -5,12 +5,18 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Callable
 from socket import create_connection, socket
+from socket import timeout as socket_timeout
 from ssl import SSLContext
 from typing import TypedDict
 
 from librouteros.api import Api, AsyncApi
 from librouteros.connections import AsyncSocketTransport, SocketTransport
-from librouteros.exceptions import ConnectionClosed, FatalError
+from librouteros.exceptions import (
+    ConnectionClosed,
+    FatalError,
+    RouterAsyncTimeoutError,
+    RouterSyncTimeoutError,
+)
 from librouteros.login import (
     async_plain,
     async_token,  # noqa F401
@@ -153,11 +159,14 @@ def create_transport(
     timeout: float,
     ssl_wrapper: Callable[[socket], socket] | None = None,
 ) -> SocketTransport:
-    sock: socket = create_connection(
-        (host, port),
-        timeout=timeout,
-        source_address=(saddr, 0) if saddr is not None else None,
-    )
+    try:
+        sock: socket = create_connection(
+            (host, port),
+            timeout=timeout,
+            source_address=(saddr, 0) if saddr is not None else None,
+        )
+    except socket_timeout as error:
+        raise RouterSyncTimeoutError from error
     if ssl_wrapper:
         sock = ssl_wrapper(sock)
     return SocketTransport(sock=sock)
@@ -171,13 +180,16 @@ async def async_create_transport(
     timeout: float,
     ssl_wrapper: SSLContext | None = None,
 ) -> AsyncSocketTransport:
-    reader, writer = await asyncio.wait_for(
-        asyncio.open_connection(
-            host=host,
-            port=port,
-            ssl=ssl_wrapper,
-            local_addr=(saddr, 0) if saddr is not None else None,
-        ),
-        timeout=timeout,
-    )
+    try:
+        reader, writer = await asyncio.wait_for(
+            asyncio.open_connection(
+                host=host,
+                port=port,
+                ssl=ssl_wrapper,
+                local_addr=(saddr, 0) if saddr is not None else None,
+            ),
+            timeout=timeout,
+        )
+    except asyncio.TimeoutError as error:
+        raise RouterAsyncTimeoutError from error
     return AsyncSocketTransport(reader=reader, writer=writer)

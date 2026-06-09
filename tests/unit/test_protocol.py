@@ -1,6 +1,7 @@
 # -*- coding: UTF-8 -*-
 
-from unittest.mock import MagicMock, patch
+import asyncio
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from hypothesis import given
@@ -10,6 +11,7 @@ from librouteros.connections import AsyncSocketTransport, SocketTransport
 from librouteros.exceptions import (
     FatalError,
     ProtocolError,
+    RouterAsyncTimeoutError,
 )
 from librouteros.protocol import (
     ApiProtocol,
@@ -166,3 +168,31 @@ class Test_ApiProtocol:
         # async
         await self.async_protocol.close()
         self.async_protocol.transport.close.assert_called_once_with()
+
+    @pytest.mark.asyncio
+    async def test_async_writeSentence_raises_RouterAsyncTimeoutError(self):
+        """A timed-out write raises RouterAsyncTimeoutError (and chains the original)."""
+
+        async def hang(_data):
+            await asyncio.sleep(10)
+
+        self.async_protocol.timeout = 0.01
+        self.async_protocol.transport.write = AsyncMock(side_effect=hang)
+        with pytest.raises(RouterAsyncTimeoutError) as error:
+            await self.async_protocol.writeSentence("/ip/address/print")
+        assert isinstance(error.value, asyncio.TimeoutError)
+        assert isinstance(error.value.__cause__, asyncio.TimeoutError)
+
+    @pytest.mark.asyncio
+    async def test_async_readSentence_raises_RouterAsyncTimeoutError(self):
+        """A timed-out read raises RouterAsyncTimeoutError (and chains the original)."""
+
+        async def hang(_length):
+            await asyncio.sleep(10)
+
+        self.async_protocol.timeout = 0.01
+        self.async_protocol.transport.read = AsyncMock(side_effect=hang)
+        with pytest.raises(RouterAsyncTimeoutError) as error:
+            await self.async_protocol.readSentence()
+        assert isinstance(error.value, asyncio.TimeoutError)
+        assert isinstance(error.value.__cause__, asyncio.TimeoutError)

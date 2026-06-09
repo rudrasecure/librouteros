@@ -1,4 +1,5 @@
 # -*- coding: UTF-8 -*-
+import asyncio
 import socket
 from unittest.mock import (
     Mock,
@@ -18,7 +19,11 @@ from librouteros import (
     connect,
     create_transport,
 )
-from librouteros.exceptions import TrapError
+from librouteros.exceptions import (
+    RouterAsyncTimeoutError,
+    RouterSyncTimeoutError,
+    TrapError,
+)
 from librouteros.login import (
     async_plain,
     encode_password,
@@ -120,6 +125,22 @@ async def test_async_create_transport_passes_src_addr(conn_mock):
     )
 
 
+@pytest.mark.asyncio
+@patch("librouteros.asyncio.open_connection")
+async def test_async_create_transport_raises_RouterAsyncTimeoutError(conn_mock):
+    """A timed-out connect handshake raises RouterAsyncTimeoutError."""
+
+    async def hang(**_kwargs):
+        await asyncio.sleep(10)
+
+    conn_mock.side_effect = hang
+    params = {k: v for k, v in ASYNC_DEFAULTS.items() if k in TRANSPORT_PARAMS}
+    params["timeout"] = 0.01
+    with pytest.raises(RouterAsyncTimeoutError) as error:
+        await async_create_transport(host="127.0.0.1", **params)
+    assert isinstance(error.value, asyncio.TimeoutError)
+
+
 @patch("librouteros.create_connection")
 def test_crate_transport_calls_ssl_wrapper(connection_mock):
     params = {k: v for k, v in DEFAULTS.items() if k in TRANSPORT_PARAMS}
@@ -151,7 +172,7 @@ async def test_async_connect_raises_when_failed_login(transport_mock):
         await async_connect(host="127.0.0.1", username="admin", password="", login_method=failed)
 
 
-@pytest.mark.parametrize("exc", (socket.error, socket.timeout))
+@pytest.mark.parametrize("exc", (socket.error,))
 @patch("librouteros.create_connection")
 @patch("librouteros.SocketTransport")
 def test_create_connection_does_not_wrap_socket_exceptions(create_connection, transport, exc):
@@ -166,17 +187,10 @@ def test_create_connection_does_not_wrap_socket_exceptions(create_connection, tr
         create_transport(**kwargs)
 
 
-@pytest.mark.asyncio
-@pytest.mark.parametrize("exc", (socket.error, socket.timeout))
 @patch("librouteros.create_connection")
-@patch("librouteros.SocketTransport")
-async def test_async_create_connection_does_not_wrap_socket_exceptions(create_connection, transport, exc):
-    kwargs = {
-        "host": "127.0.0.1",
-        "port": 22,
-        "timeout": 2,
-        "saddr": "",
-    }
-    transport.side_effect = exc
-    with pytest.raises(exc):
-        await create_transport(**kwargs)
+def test_create_transport_timeout_raises_RouterSyncTimeoutError(conn_mock):
+    """A sync connect timeout is converted to RouterSyncTimeoutError."""
+    conn_mock.side_effect = socket.timeout
+    with pytest.raises(RouterSyncTimeoutError) as error:
+        create_transport(host="127.0.0.1", port=22, timeout=2, saddr="")
+    assert isinstance(error.value, OSError)

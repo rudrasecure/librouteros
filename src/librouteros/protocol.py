@@ -10,6 +10,7 @@ from librouteros.connections import AsyncSocketTransport, SocketTransport
 from librouteros.exceptions import (
     FatalError,
     ProtocolError,
+    RouterAsyncTimeoutError,
 )
 from librouteros.types import ROSType
 
@@ -213,7 +214,10 @@ class AsyncApiProtocol:
         """
         encoded: bytes = encode_sentence(cmd, *words, encoding=self.encoding)
         log("<---", cmd, *words)
-        await asyncio.wait_for(self.transport.write(encoded), self.timeout)
+        try:
+            await asyncio.wait_for(self.transport.write(encoded), self.timeout)
+        except asyncio.TimeoutError as error:
+            raise RouterAsyncTimeoutError from error
 
     async def readSentence(self) -> tuple[str, tuple[str, ...]]:  # noqa N802
         """
@@ -228,7 +232,10 @@ class AsyncApiProtocol:
                 sentence.append(word)
             return tuple(sentence)
 
-        sentence: tuple[str, ...] = await asyncio.wait_for(inner(), self.timeout)
+        try:
+            sentence: tuple[str, ...] = await asyncio.wait_for(inner(), self.timeout)
+        except asyncio.TimeoutError as error:
+            raise RouterAsyncTimeoutError from error
         log("--->", *sentence)
         reply_word, words = sentence[0], sentence[1:]
         if reply_word == "!fatal":

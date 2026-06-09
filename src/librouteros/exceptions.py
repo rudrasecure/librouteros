@@ -2,9 +2,23 @@
 
 from __future__ import annotations
 
+import asyncio
+
 
 class LibRouterosError(Exception):
     """Base exception for all other."""
+
+
+class RouterTimeoutError(LibRouterosError):
+    """Base router read/write/connect timeout"""
+
+
+class RouterAsyncTimeoutError(RouterTimeoutError, asyncio.TimeoutError):
+    """Async timeout; also an asyncio.TimeoutError for back-compat."""
+
+
+class RouterSyncTimeoutError(RouterTimeoutError, OSError):
+    """Sync timeout; also an OSError (like socket.timeout) for back-compat."""
 
 
 # TODO append with Error

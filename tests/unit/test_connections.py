@@ -9,6 +9,7 @@ import pytest
 from librouteros.connections import AsyncSocketTransport, SocketTransport
 from librouteros.exceptions import (
     ConnectionClosed,
+    RouterSyncTimeoutError,
 )
 
 
@@ -57,11 +58,28 @@ class Test_SocketTransport:
             call(1),
         ]
 
-    @pytest.mark.parametrize("exception", (socket.error, socket.timeout))
+    @pytest.mark.parametrize("exception", (socket.error,))
     def test_recv_raises_socket_errors(self, exception):
+        """Non-timeout socket errors propagate unchanged."""
         self.transport.sock.recv.side_effect = exception
         with pytest.raises(exception):
             self.transport.read(2)
+
+    def test_recv_timeout_raises_RouterSyncTimeoutError(self):
+        """A socket recv timeout is converted to RouterSyncTimeoutError (and chained)."""
+        self.transport.sock.recv.side_effect = socket.timeout
+        with pytest.raises(RouterSyncTimeoutError) as error:
+            self.transport.read(2)
+        assert isinstance(error.value, OSError)
+        assert isinstance(error.value.__cause__, socket.timeout)
+
+    def test_sendall_timeout_raises_RouterSyncTimeoutError(self):
+        """A socket sendall timeout is converted to RouterSyncTimeoutError (and chained)."""
+        self.transport.sock.sendall.side_effect = socket.timeout
+        with pytest.raises(RouterSyncTimeoutError) as error:
+            self.transport.write(b"data")
+        assert isinstance(error.value, OSError)
+        assert isinstance(error.value.__cause__, socket.timeout)
 
 
 class Test_AsyncSocketTransport:

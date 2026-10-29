@@ -1,7 +1,29 @@
+4.2.2
+-----
+
+* Parse RouterOS version strings
+* Close the transport when login fails in connect()
+* Fix file-read offset advancing
+* Return an empty id from Path.add when RouterOS omits =ret=
+* Close the transport when login fails in connect()
+
+4.2.1
+-----
+
+* Prevent ``AsyncApiProtocol.close()`` from hanging.
+
+4.2.0
+-----
+
+* Add configuration management (``Config``/``AsyncConfig``, ``api.config()``):
+  export, import/merge, validate, compare, backup, a scheduler-based rollback
+  safety net and reset-based replace. RouterOS 7.x, binary API only (no SSH).
+
 4.1.1
 ----------
 
 * Drop python 3.9 support
+* Fix parse_word edge case
 
 4.0.1
 ----------

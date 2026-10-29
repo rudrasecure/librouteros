@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from logging import NullHandler, getLogger
-from typing import Final, Literal
+from typing import Final
 
 from librouteros.connections import AsyncSocketTransport, SocketTransport
 from librouteros.exceptions import (
@@ -17,7 +17,7 @@ LOGGER = getLogger("librouteros")
 LOGGER.addHandler(NullHandler())
 
 # big is network byte order
-API_BYTE_ORDER: Final[Literal["big"]] = "big"
+API_BYTE_ORDER: Final = "big"
 
 
 def parse_word(word: str) -> tuple[str, ROSType]:
@@ -32,7 +32,9 @@ def parse_word(word: str) -> tuple[str, ROSType]:
     mapping: dict[str, bool] = {"yes": True, "true": True, "no": False, "false": False}
     _, key, value = word.split("=", 2)
     try:
-        ros_value: ROSType = int(value)
+        as_int = int(value)
+        # Keep int only if str cast gives original value, else preserve string ("00" -> "00").
+        ros_value: ROSType = as_int if str(as_int) == value else value
     except ValueError:
         ros_value = mapping.get(value, value)
     return (key, ros_value)
@@ -248,4 +250,5 @@ class AsyncApiProtocol:
         return word.decode(encoding=self.encoding, errors="ignore")
 
     async def close(self) -> None:
-        await self.transport.close()
+        # Timeout guard so an unresponsive peer cannot make close() hang
+        await asyncio.wait_for(self.transport.close(), self.timeout)
